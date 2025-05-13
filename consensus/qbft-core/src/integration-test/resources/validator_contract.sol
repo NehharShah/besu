@@ -14,8 +14,12 @@
  */
 pragma solidity >= 0.5.3;
 
+// ... existing code ...
 contract Validators {
     address[] validators;
+    uint256 private networkState;
+    // Add new private mutable variable
+    uint256 private participantState;
 
     constructor() {}
 
@@ -23,4 +27,20 @@ contract Validators {
         return validators;
     }
 
+    function getNetworkState() public view returns (uint256) {
+        return networkState;
+    }
+
+    function setNetworkState(uint256 _state) public {
+        networkState = _state;
+    }
+
+    // Add new getter and setter for participantState
+    function getParticipantState() public view returns (uint256) {
+        return participantState;
+    }
+
+    function setParticipantState(uint256 _state) public {
+        participantState = _state;
+    }
 }

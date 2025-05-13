@@ -15,14 +15,15 @@
 package org.hyperledger.besu.consensus.qbft.validator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hyperledger.besu.consensus.qbft.validator.ValidatorContractController.GET_VALIDATORS;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import org.hyperledger.besu.config.JsonQbftConfigOptions;
-import org.hyperledger.besu.consensus.qbft.MutableQbftConfigOptions;
 import org.hyperledger.besu.datatypes.Address;
 import org.hyperledger.besu.ethereum.core.Transaction;
-import org.hyperledger.besu.ethereum.mainnet.ImmutableTransactionValidationParams;
 import org.hyperledger.besu.ethereum.mainnet.TransactionValidationParams;
 import org.hyperledger.besu.ethereum.mainnet.ValidationResult;
 import org.hyperledger.besu.ethereum.processing.TransactionProcessingResult;
@@ -37,14 +38,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.apache.tuweni.bytes.Bytes;
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.web3j.abi.FunctionEncoder;
-import org.web3j.abi.TypeReference;
-import org.web3j.abi.datatypes.DynamicArray;
-import org.web3j.abi.datatypes.Function;
 
 public class ValidatorContractControllerTest {
   private static final String GET_VALIDATORS_FUNCTION_RESULT =
@@ -53,29 +49,20 @@ public class ValidatorContractControllerTest {
       Address.fromHexString("0xeac51e3fe1afc9894f0dfeab8ceb471899b932df");
   private static final Address CONTRACT_ADDRESS = Address.fromHexString("1");
   private static final TransactionValidationParams ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS =
-      ImmutableTransactionValidationParams.builder()
-          .from(TransactionValidationParams.transactionSimulator())
-          .isAllowExceedingBalance(true)
-          .build();
+      TransactionValidationParams.transactionSimulatorAllowExceedingBalance();
+  private static final long TEST_STATE = 42L;
+  private static final Bytes TEST_STATE_BYTES =
+      Bytes.fromHexString("0x000000000000000000000000000000000000000000000000000000000000002a");
 
-  private final TransactionSimulator transactionSimulator =
-      Mockito.mock(TransactionSimulator.class);
-
-  private final Transaction transaction = Mockito.mock(Transaction.class);
-  private CallParameter callParameter;
+  private TransactionSimulator transactionSimulator;
+  private ValidatorContractController validatorContractController;
+  private Transaction transaction;
 
   @BeforeEach
   public void setup() {
-    final Function getValidatorsFunction =
-        new Function(
-            GET_VALIDATORS,
-            List.of(),
-            List.of(new TypeReference<DynamicArray<org.web3j.abi.datatypes.Address>>() {}));
-    final Bytes payload = Bytes.fromHexString(FunctionEncoder.encode(getValidatorsFunction));
-    callParameter = new CallParameter(null, CONTRACT_ADDRESS, -1, null, null, payload);
-    final MutableQbftConfigOptions qbftConfigOptions =
-        new MutableQbftConfigOptions(JsonQbftConfigOptions.DEFAULT);
-    qbftConfigOptions.setValidatorContractAddress(Optional.of(CONTRACT_ADDRESS.toHexString()));
+    transactionSimulator = Mockito.mock(TransactionSimulator.class);
+    validatorContractController = new ValidatorContractController(transactionSimulator);
+    transaction = Mockito.mock(Transaction.class);
   }
 
   @Test
@@ -91,14 +78,12 @@ public class ValidatorContractControllerTest {
                 ValidationResult.valid()));
 
     when(transactionSimulator.process(
-            callParameter,
-            ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS,
-            OperationTracer.NO_TRACING,
-            1))
+            any(CallParameter.class),
+            eq(ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS),
+            eq(OperationTracer.NO_TRACING),
+            eq(1L)))
         .thenReturn(Optional.of(result));
 
-    final ValidatorContractController validatorContractController =
-        new ValidatorContractController(transactionSimulator);
     final Collection<Address> validators =
         validatorContractController.getValidators(1, CONTRACT_ADDRESS);
     assertThat(validators).containsExactly(VALIDATOR_ADDRESS);
@@ -113,16 +98,13 @@ public class ValidatorContractControllerTest {
                 ValidationResult.invalid(TransactionInvalidReason.INTERNAL_ERROR)));
 
     when(transactionSimulator.process(
-            callParameter,
-            ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS,
-            OperationTracer.NO_TRACING,
-            1))
+            any(CallParameter.class),
+            eq(ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS),
+            eq(OperationTracer.NO_TRACING),
+            eq(1L)))
         .thenReturn(Optional.of(result));
 
-    final ValidatorContractController validatorContractController =
-        new ValidatorContractController(transactionSimulator);
-    Assertions.assertThatThrownBy(
-            () -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
+    assertThatThrownBy(() -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
         .hasMessageContaining("Failed validator smart contract call");
   }
 
@@ -139,16 +121,13 @@ public class ValidatorContractControllerTest {
                 Optional.empty()));
 
     when(transactionSimulator.process(
-            callParameter,
-            ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS,
-            OperationTracer.NO_TRACING,
-            1))
+            any(CallParameter.class),
+            eq(ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS),
+            eq(OperationTracer.NO_TRACING),
+            eq(1L)))
         .thenReturn(Optional.of(result));
 
-    final ValidatorContractController validatorContractController =
-        new ValidatorContractController(transactionSimulator);
-    Assertions.assertThatThrownBy(
-            () -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
+    assertThatThrownBy(() -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
         .hasMessageContaining("Failed validator smart contract call");
   }
 
@@ -161,33 +140,125 @@ public class ValidatorContractControllerTest {
                 List.of(), 0, 0, Bytes.EMPTY, ValidationResult.valid()));
 
     when(transactionSimulator.process(
-            callParameter,
-            ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS,
-            OperationTracer.NO_TRACING,
-            1))
+            any(CallParameter.class),
+            eq(ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS),
+            eq(OperationTracer.NO_TRACING),
+            eq(1L)))
         .thenReturn(Optional.of(result));
 
-    final ValidatorContractController validatorContractController =
-        new ValidatorContractController(transactionSimulator);
-
-    Assertions.assertThatThrownBy(
-            () -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
+    assertThatThrownBy(() -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
         .hasMessage("Unexpected empty result from validator smart contract call");
   }
 
   @Test
   public void throwErrorIfEmptySimulationResult() {
     when(transactionSimulator.process(
-            callParameter,
-            ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS,
-            OperationTracer.NO_TRACING,
-            1))
+            any(CallParameter.class),
+            eq(ALLOW_EXCEEDING_BALANCE_VALIDATION_PARAMS),
+            eq(OperationTracer.NO_TRACING),
+            eq(1L)))
         .thenReturn(Optional.empty());
 
-    final ValidatorContractController validatorContractController =
-        new ValidatorContractController(transactionSimulator);
-    Assertions.assertThatThrownBy(
-            () -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
+    assertThatThrownBy(() -> validatorContractController.getValidators(1, CONTRACT_ADDRESS))
         .hasMessage("Failed validator smart contract call");
+  }
+
+  @Test
+  public void getNetworkStateReturnsExpectedValue() {
+    final TransactionSimulatorResult result =
+        new TransactionSimulatorResult(
+            transaction,
+            TransactionProcessingResult.successful(
+                List.of(), 0, 0, TEST_STATE_BYTES, ValidationResult.valid()));
+
+    when(transactionSimulator.process(
+            any(CallParameter.class),
+            any(TransactionValidationParams.class),
+            any(OperationTracer.class),
+            anyLong()))
+        .thenReturn(Optional.of(result));
+
+    final Long retrievedState = validatorContractController.getNetworkState(1, CONTRACT_ADDRESS);
+    assertThat(retrievedState).isEqualTo(TEST_STATE);
+  }
+
+  @Test
+  public void getNetworkStateFailsIfContractCallFails() {
+    final TransactionSimulatorResult result =
+        new TransactionSimulatorResult(
+            transaction,
+            TransactionProcessingResult.invalid(
+                ValidationResult.invalid(TransactionInvalidReason.INTERNAL_ERROR)));
+
+    when(transactionSimulator.process(
+            any(CallParameter.class),
+            any(TransactionValidationParams.class),
+            any(OperationTracer.class),
+            anyLong()))
+        .thenReturn(Optional.of(result));
+
+    assertThatThrownBy(() -> validatorContractController.getNetworkState(1, CONTRACT_ADDRESS))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(ValidatorContractController.CONTRACT_ERROR_MSG);
+  }
+
+  @Test
+  public void getParticipantStateReturnsExpectedValue() {
+    final TransactionSimulatorResult result =
+        new TransactionSimulatorResult(
+            transaction,
+            TransactionProcessingResult.successful(
+                List.of(), 0, 0, TEST_STATE_BYTES, ValidationResult.valid()));
+
+    when(transactionSimulator.process(
+            any(CallParameter.class),
+            any(TransactionValidationParams.class),
+            any(OperationTracer.class),
+            anyLong()))
+        .thenReturn(Optional.of(result));
+
+    final Long retrievedState = validatorContractController.getParticipantState(1, CONTRACT_ADDRESS);
+    assertThat(retrievedState).isEqualTo(TEST_STATE);
+  }
+
+  @Test
+  public void setParticipantStateSucceeds() {
+    final TransactionSimulatorResult result =
+        new TransactionSimulatorResult(
+            transaction,
+            TransactionProcessingResult.successful(
+                List.of(), 0, 0, Bytes.EMPTY, ValidationResult.valid()));
+
+    when(transactionSimulator.process(
+            any(CallParameter.class),
+            any(TransactionValidationParams.class),
+            any(OperationTracer.class),
+            anyLong()))
+        .thenReturn(Optional.of(result));
+
+    assertThatCode(() -> 
+        validatorContractController.setParticipantState(1, CONTRACT_ADDRESS, TEST_STATE))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  public void setParticipantStateFailsIfContractCallFails() {
+    final TransactionSimulatorResult result =
+        new TransactionSimulatorResult(
+            transaction,
+            TransactionProcessingResult.invalid(
+                ValidationResult.invalid(TransactionInvalidReason.INTERNAL_ERROR)));
+
+    when(transactionSimulator.process(
+            any(CallParameter.class),
+            any(TransactionValidationParams.class),
+            any(OperationTracer.class),
+            anyLong()))
+        .thenReturn(Optional.of(result));
+
+    assertThatThrownBy(() -> 
+        validatorContractController.setParticipantState(1, CONTRACT_ADDRESS, TEST_STATE))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(ValidatorContractController.CONTRACT_ERROR_MSG);
   }
 }
