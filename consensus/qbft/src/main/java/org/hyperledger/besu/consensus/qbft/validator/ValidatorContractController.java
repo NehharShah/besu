@@ -41,9 +41,6 @@ public class ValidatorContractController {
   /** The constant GET_VALIDATORS. */
   public static final String GET_VALIDATORS = "getValidators";
 
-  /** The constant GET_NETWORK_STATE. */
-  public static final String GET_NETWORK_STATE = "getNetworkState";
-
   /** The constant GET_PARTICIPANT_STATE. */
   public static final String GET_PARTICIPANT_STATE = "getParticipantState";
 
@@ -55,7 +52,6 @@ public class ValidatorContractController {
 
   private final TransactionSimulator transactionSimulator;
   private final Function getValidatorsFunction;
-  private final Function getNetworkStateFunction;
   private final Function getParticipantStateFunction;
 
   /**
@@ -72,12 +68,6 @@ public class ValidatorContractController {
               GET_VALIDATORS,
               List.of(),
               List.of(new TypeReference<DynamicArray<org.web3j.abi.datatypes.Address>>() {}));
-
-      this.getNetworkStateFunction =
-          new Function(
-              GET_NETWORK_STATE,
-              List.of(),
-              List.of(new TypeReference<org.web3j.abi.datatypes.Uint>() {}));
 
       this.getParticipantStateFunction =
           new Function(
@@ -99,19 +89,6 @@ public class ValidatorContractController {
   public Collection<Address> getValidators(final long blockNumber, final Address contractAddress) {
     return callFunction(blockNumber, getValidatorsFunction, contractAddress)
         .map(this::parseGetValidatorsResult)
-        .orElseThrow(() -> new IllegalStateException(CONTRACT_ERROR_MSG));
-  }
-
-  /**
-   * Gets network state.
-   *
-   * @param blockNumber the block number
-   * @param contractAddress the contract address
-   * @return the network state
-   */
-  public Long getNetworkState(final long blockNumber, final Address contractAddress) {
-    return callFunction(blockNumber, getNetworkStateFunction, contractAddress)
-        .map(this::parseGetNetworkStateResult)
         .orElseThrow(() -> new IllegalStateException(CONTRACT_ERROR_MSG));
   }
 
@@ -155,12 +132,6 @@ public class ValidatorContractController {
     return addresses.stream()
         .map(a -> Address.fromHexString(a.getValue()))
         .collect(Collectors.toList());
-  }
-
-  @SuppressWarnings({"rawtypes"})
-  private Long parseGetNetworkStateResult(final TransactionSimulatorResult result) {
-    final List<Type> resultDecoding = decodeResult(result, getNetworkStateFunction);
-    return ((java.math.BigInteger) resultDecoding.get(0).getValue()).longValue();
   }
 
   @SuppressWarnings({"rawtypes"})

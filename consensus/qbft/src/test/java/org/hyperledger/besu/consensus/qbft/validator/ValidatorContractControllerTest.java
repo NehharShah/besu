@@ -164,45 +164,6 @@ public class ValidatorContractControllerTest {
   }
 
   @Test
-  public void getNetworkStateReturnsExpectedValue() {
-    final TransactionSimulatorResult result =
-        new TransactionSimulatorResult(
-            transaction,
-            TransactionProcessingResult.successful(
-                List.of(), 0, 0, TEST_STATE_BYTES, ValidationResult.valid()));
-
-    when(transactionSimulator.process(
-            any(CallParameter.class),
-            any(TransactionValidationParams.class),
-            any(OperationTracer.class),
-            anyLong()))
-        .thenReturn(Optional.of(result));
-
-    final Long retrievedState = validatorContractController.getNetworkState(1, CONTRACT_ADDRESS);
-    assertThat(retrievedState).isEqualTo(TEST_STATE);
-  }
-
-  @Test
-  public void getNetworkStateFailsIfContractCallFails() {
-    final TransactionSimulatorResult result =
-        new TransactionSimulatorResult(
-            transaction,
-            TransactionProcessingResult.invalid(
-                ValidationResult.invalid(TransactionInvalidReason.INTERNAL_ERROR)));
-
-    when(transactionSimulator.process(
-            any(CallParameter.class),
-            any(TransactionValidationParams.class),
-            any(OperationTracer.class),
-            anyLong()))
-        .thenReturn(Optional.of(result));
-
-    assertThatThrownBy(() -> validatorContractController.getNetworkState(1, CONTRACT_ADDRESS))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining(ValidatorContractController.CONTRACT_ERROR_MSG);
-  }
-
-  @Test
   public void getParticipantStateReturnsExpectedValue() {
     final TransactionSimulatorResult result =
         new TransactionSimulatorResult(
