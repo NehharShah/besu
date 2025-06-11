@@ -16,6 +16,7 @@ pragma solidity >= 0.5.3;
 
 contract Validators {
     address[] validators;
+    uint256 private participantState;
 
     constructor() {}
 
@@ -23,4 +24,11 @@ contract Validators {
         return validators;
     }
 
+    function getParticipantState() public view returns (uint256) {
+        return participantState;
+    }
+
+    function setParticipantState(uint256 _state) public {
+        participantState = _state;
+    }
 }

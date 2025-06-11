@@ -33,17 +33,26 @@ import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.DynamicArray;
 import org.web3j.abi.datatypes.Function;
 import org.web3j.abi.datatypes.Type;
+import java.math.BigInteger;
+import java.util.Collections;
 
 /** The Validator contract controller. */
 public class ValidatorContractController {
   /** The constant GET_VALIDATORS. */
   public static final String GET_VALIDATORS = "getValidators";
 
+  /** The constant GET_PARTICIPANT_STATE. */
+  public static final String GET_PARTICIPANT_STATE = "getParticipantState";
+
+  /** The constant SET_PARTICIPANT_STATE. */
+  public static final String SET_PARTICIPANT_STATE = "setParticipantState";
+
   /** The constant CONTRACT_ERROR_MSG. */
   public static final String CONTRACT_ERROR_MSG = "Failed validator smart contract call";
 
   private final TransactionSimulator transactionSimulator;
   private final Function getValidatorsFunction;
+  private final Function getParticipantStateFunction;
 
   /**
    * Instantiates a new Validator contract controller.
@@ -59,6 +68,12 @@ public class ValidatorContractController {
               GET_VALIDATORS,
               List.of(),
               List.of(new TypeReference<DynamicArray<org.web3j.abi.datatypes.Address>>() {}));
+
+      this.getParticipantStateFunction =
+          new Function(
+              GET_PARTICIPANT_STATE,
+              List.of(),
+              List.of(new TypeReference<org.web3j.abi.datatypes.Uint>() {}));
     } catch (final Exception e) {
       throw new RuntimeException("Error creating smart contract function", e);
     }
@@ -77,6 +92,38 @@ public class ValidatorContractController {
         .orElseThrow(() -> new IllegalStateException(CONTRACT_ERROR_MSG));
   }
 
+  /**
+   * Gets participant state.
+   *
+   * @param blockNumber the block number
+   * @param contractAddress the contract address
+   * @return the participant state
+   */
+  public Long getParticipantState(final long blockNumber, final Address contractAddress) {
+    return callFunction(blockNumber, getParticipantStateFunction, contractAddress)
+        .map(this::parseGetParticipantStateResult)
+        .orElseThrow(() -> new IllegalStateException(CONTRACT_ERROR_MSG));
+  }
+
+  /**
+   * Sets participant state.
+   *
+   * @param blockNumber the block number
+   * @param contractAddress the contract address
+   * @param state the state to set
+   */
+  public void setParticipantState(final long blockNumber, final Address contractAddress, final long state) {
+    final Function function = new Function(
+        SET_PARTICIPANT_STATE,
+        Collections.singletonList(new org.web3j.abi.datatypes.generated.Uint256(BigInteger.valueOf(state))),
+        List.of());
+    var result = callFunction(blockNumber, function, contractAddress)
+        .orElseThrow(() -> new IllegalStateException(CONTRACT_ERROR_MSG));
+    if (!result.isSuccessful()) {
+      throw new IllegalStateException(CONTRACT_ERROR_MSG + ": " + result.getValidationResult());
+    }
+  }
+
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Collection<Address> parseGetValidatorsResult(final TransactionSimulatorResult result) {
     final List<Type> resultDecoding = decodeResult(result, getValidatorsFunction);
@@ -85,6 +132,12 @@ public class ValidatorContractController {
     return addresses.stream()
         .map(a -> Address.fromHexString(a.getValue()))
         .collect(Collectors.toList());
+  }
+
+  @SuppressWarnings({"rawtypes"})
+  private Long parseGetParticipantStateResult(final TransactionSimulatorResult result) {
+    final List<Type> resultDecoding = decodeResult(result, getParticipantStateFunction);
+    return ((java.math.BigInteger) resultDecoding.get(0).getValue()).longValue();
   }
 
   private Optional<TransactionSimulatorResult> callFunction(
